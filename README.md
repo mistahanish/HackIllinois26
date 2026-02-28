@@ -58,4 +58,4 @@ The app will load and you’ll see the blank home screen. If you change the code
   In the terminal where `npm start` is running, press `s` to switch to “tunnel”. Wait for the new QR code and scan it again. Slower but works when phone and PC aren’t on the same LAN.
 
 - **“Incompatible SDK version” / Expo Go out of date**  
-  This project is pinned to **Expo SDK 51** so it works with older Expo Go builds (e.g. from the store on older devices). If you still see an SDK error, your Expo Go may need a newer build—check for app updates, or use [expo.dev/go](https://expo.dev/go) to install a specific Expo Go version that matches SDK 51.
+  This project uses **Expo SDK 54** so it works with older Expo Go builds (e.g. from the store on older devices). If you still see an SDK error, your Expo Go may need a newer build—check for app updates, or use [expo.dev/go](https://expo.dev/go) to install a specific Expo Go version that matches SDK 54.
