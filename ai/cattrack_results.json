@@ -1,0 +1,104 @@
+{
+  "run_at": "2026-02-28T18:01:13.927125Z",
+  "data_dir": "/home/cartorh/Desktop/Hobbies/Projects/Hackathons/HackAstra2026/HackIllinois26/HackIL26-CATrack",
+  "image_registry": [
+    {
+      "path": "Pass/GoodStep.jpg",
+      "type": "steps_handrails",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/BrokenRimBolt1.jpg",
+      "type": "tires_rims",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/BrokenRimBolt2.jpg",
+      "type": "tires_rims",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/HousingSeal.jpg",
+      "type": "hydraulic",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/HydraulicFluidTank.jpg",
+      "type": "hydraulic",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/HydraulicHose.jpg",
+      "type": "hydraulic",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/CoolantReservoir.jpg",
+      "type": "cooling",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Pass/HydraulicFluidFiltrationSystem.jpg",
+      "type": "hydraulic",
+      "ground_truth": "pass"
+    },
+    {
+      "path": "Fail/DamagedAccessLadder.jpg",
+      "type": "steps_handrails",
+      "ground_truth": "fail"
+    },
+    {
+      "path": "Fail/StructuralDamage.jpg",
+      "type": "structural",
+      "ground_truth": "fail"
+    },
+    {
+      "path": "Fail/Tire ShowsSignsUnevenWear.jpg",
+      "type": "tires_rims",
+      "ground_truth": "fail"
+    },
+    {
+      "path": "Fail/HydraulicFluidFiltration.jpg",
+      "type": "hydraulic",
+      "ground_truth": "fail"
+    },
+    {
+      "path": "Fail/CoolingSystemHose.jpg",
+      "type": "cooling",
+      "ground_truth": "fail"
+    },
+    {
+      "path": "Fail/RustOnHydraulicComponentBracket.jpg",
+      "type": "hydraulic",
+      "ground_truth": "fail"
+    }
+  ],
+  "results": [
+    {
+      "image": "Fail/Tire ShowsSignsUnevenWear.jpg",
+      "image_type": "tires_rims",
+      "ground_truth": "fail",
+      "verdict": null,
+      "raw_response": null,
+      "error": null,
+      "bounding_boxes": []
+    }
+  ],
+  "metrics": {
+    "total": 14,
+    "correct": 9,
+    "accuracy": 0.6428571428571429,
+    "by_ground_truth": {
+      "pass": {
+        "correct": 6,
+        "total": 8,
+        "accuracy": 0.75
+      },
+      "fail": {
+        "correct": 3,
+        "total": 6,
+        "accuracy": 0.5
+      }
+    }
+  }
+}
