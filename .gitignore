@@ -218,7 +218,3 @@ yarn-error.*
 *.tsbuildinfo
 /ios
 /android
-
-
-# Ignore all JPG images in any subfolder of ai/
-ai/*/*.jpg

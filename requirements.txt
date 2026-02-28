@@ -1,5 +1,3 @@
-google-genai>=1.0.0
-python-dotenv>=1.0.0
-# google-generativeai kept for gemini_basic.py / gemini_image_test.py (optional; cattrack uses google-genai)
 google-generativeai>=0.8.0
+python-dotenv>=1.0.0
 Pillow>=10.0.0

@@ -99,11 +99,11 @@ A terminal UI will open with a **QR code**.
 
 **Troubleshooting**
 
-| Issue | What to do |
-|-------|------------|
-| “Couldn’t connect” / “Network response timed out” | Same Wi‑Fi for phone and PC; turn off VPN on both if needed; try toggling Wi‑Fi on the phone. |
-| Phone and PC on different networks | In the terminal where `npm start` is running, press **`s`** to switch to **tunnel** mode, wait for the new QR code, then scan again. |
-| “Incompatible SDK version” | Project uses **Expo SDK 54**. Update Expo Go, or use [expo.dev/go](https://expo.dev/go) to get a matching build. |
+| Issue                                             | What to do                                                                                                                           |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| “Couldn’t connect” / “Network response timed out” | Same Wi‑Fi for phone and PC; turn off VPN on both if needed; try toggling Wi‑Fi on the phone.                                        |
+| Phone and PC on different networks                | In the terminal where `npm start` is running, press **`s`** to switch to **tunnel** mode, wait for the new QR code, then scan again. |
+| “Incompatible SDK version”                        | Project uses **Expo SDK 54**. Update Expo Go, or use [expo.dev/go](https://expo.dev/go) to get a matching build.                     |
 
 ---
 
@@ -180,12 +180,96 @@ The script contains a hardcoded Supabase connection string; change it for your o
 
 ---
 
+## 5. Deploy the app
+
+You can ship the Expo app as **standalone iOS/Android builds** (via EAS Build) or as a **web app**. Supabase is already hosted; ensure your production Supabase project and env vars are set for the build.
+
+### 5.1 EAS Build (iOS & Android)
+
+[EAS Build](https://docs.expo.dev/build/introduction/) builds your app in the cloud and produces installable binaries (e.g. for TestFlight, Google Play, or internal distribution).
+
+1. **Install EAS CLI and log in**
+
+   ```bash
+   npm install -g eas-cli
+   eas login
+   ```
+
+   Create a free account at [expo.dev/signup](https://expo.dev/signup) if needed.
+
+2. **Configure the project** (first time only)
+
+   From the project root:
+
+   ```bash
+   eas build:configure
+   ```
+
+   This creates or updates `eas.json` with build profiles (`development`, `preview`, `production`). You can use the default profiles as-is.
+
+3. **Set environment variables for builds**
+
+   The app needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` at build time (they are read by `app.config.js`). Set them as **EAS Secrets** so they are available in the cloud build:
+
+   ```bash
+   eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR_PROJECT.supabase.co"
+   eas secret:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your_anon_key_here"
+   ```
+
+   Use your real Supabase project URL and anon key (same as in `.env` for local dev). You can also configure per-profile env in `eas.json` or in the [Expo dashboard](https://expo.dev) under your project → Secrets.
+
+4. **Run a build**
+   - **Preview** (internal testing; installable without app stores):
+
+     ```bash
+     eas build --profile preview --platform all
+     ```
+
+     Use `--platform ios` or `--platform android` for one platform. When the build finishes, EAS gives you a link to download the app (e.g. .ipa for iOS, .apk for Android).
+
+   - **Production** (for App Store / Google Play submission):
+
+     ```bash
+     eas build --profile production --platform all
+     ```
+
+     Then submit to the stores (manually from the EAS dashboard or via `eas submit`). For production, ensure your Apple and Google developer accounts and signing are set up; EAS can manage credentials with `eas credentials`.
+
+**Optional: auto-submit after build**
+
+```bash
+eas build --profile production --platform all --auto-submit
+```
+
+This submits the build to TestFlight (iOS) and internal testing (Android) when the build completes, if submission is configured.
+
+### 5.2 Web (optional)
+
+The project supports web via Expo. To build and deploy the web bundle:
+
+```bash
+npx expo export --platform web
+```
+
+Output goes to `dist/` (or the path shown in the command). Upload the contents to any static host (e.g. Vercel, Netlify, GitHub Pages). Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in the host’s environment so they are available at build time.
+
+### 5.3 Supabase in production
+
+- Use a dedicated Supabase project for production, or the same one as dev.
+- Ensure the **inspections** table exists (run `scripts/create_inspections_table.sql` in the Supabase SQL Editor).
+- Restrict CORS and RLS as needed; the app uses the anon key, so follow [Supabase security practices](https://supabase.com/docs/guides/auth/row-level-security) if you add auth.
+
+---
+
 ## Quick reference
 
-| Goal | Command |
-|------|--------|
-| Run the Expo app | `./run.sh` or `conda activate HackAstra && npm start` |
-| Install app deps | `npm install` (in project root) |
-| Run Gemini text | `python ai/gemini_basic.py` (with `ai` venv and `.env` set) |
-| Run Gemini image | `python ai/gemini_image_test.py <image path>` |
-| Checklist upload (dry run) | `python upload_at_checklist.py --dry-run` |
+| Goal                       | Command                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------- |
+| Run the Expo app           | `./run.sh` or `conda activate HackAstra && npm start`                                          |
+| Install app deps           | `npm install` (in project root)                                                                |
+| Run Gemini text            | `python ai/gemini_basic.py` (with `ai` venv and `.env` set)                                    |
+| Run Gemini image           | `python ai/gemini_image_test.py <image path>`                                                  |
+| Checklist upload (dry run) | `python upload_at_checklist.py --dry-run`                                                      |
+| EAS preview build          | `eas build --profile preview --platform all` (after `eas build:configure` and setting secrets) |
+| EAS production build       | `eas build --profile production --platform all`                                                |
+| Export web bundle          | `npx expo export --platform web`                                                               |
