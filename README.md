@@ -1,6 +1,10 @@
 # HackIllinois26
 HackIllinois 2026 Submission
 
+**Full setup (app, AI scripts, checklist upload):** see **[SETUP.md](./SETUP.md)**.
+
+---
+
 ## React Native (Expo) app
 
 **Use the HackAstra conda env** when running the app:

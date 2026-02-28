@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -8,7 +8,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from './lib/supabase';
 
 const TABS = {
   FLEET: 'Fleet',
@@ -53,6 +57,52 @@ const INITIAL_INSPECTIONS = [
     assetName: 'FAMILY-ALL',
   },
 ];
+
+const USER_ID_STORAGE_KEY = '@hackillinois26_user_id';
+
+function UserIdPromptModal({ visible, userId, onUserIdChange, onContinue }) {
+  const [input, setInput] = useState(userId || '');
+
+  useEffect(() => {
+    setInput(userId || '');
+  }, [userId, visible]);
+
+  const handleContinue = () => {
+    const trimmed = input.trim();
+    if (!trimmed) return;
+    onUserIdChange(trimmed);
+    onContinue();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Enter your User ID</Text>
+          <Text style={styles.modalSubtitle}>
+            This will be used to associate inspections with you. (Google OAuth coming later.)
+          </Text>
+          <TextInput
+            style={styles.modalInput}
+            placeholder="e.g. user-123 or UUID"
+            placeholderTextColor="#9E9E9E"
+            value={input}
+            onChangeText={setInput}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={[styles.primaryButton, styles.modalButton]}
+            onPress={handleContinue}
+            disabled={!input.trim()}
+          >
+            <Text style={styles.primaryButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function AppTopBar({ title, rightContent, showMenu = true, showBack = false, onBack }) {
   return (
@@ -280,13 +330,20 @@ const INSPECTION_TYPES = [
   { key: 'Weekly', label: 'Weekly' },
 ];
 
-function CreateInspectionFormScreen({ onBack, onSubmit }) {
+function CreateInspectionFormScreen({ onBack, onSubmit, userId }) {
   const [inspectionType, setInspectionType] = useState('Daily');
   const [assetName, setAssetName] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
   const [location, setLocation] = useState('');
   const [assignmentNotes, setAssignmentNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!userId) {
+      Alert.alert('User ID Required', 'Please enter your User ID first (shown at app start).');
+      return;
+    }
+    setSubmitting(true);
     const now = new Date();
     const dateStr = now.toLocaleString('en-US', {
       month: '2-digit',
@@ -296,13 +353,33 @@ function CreateInspectionFormScreen({ onBack, onSubmit }) {
       minute: '2-digit',
       second: '2-digit',
     });
+    const appId = String(Math.floor(10000000 + Math.random() * 90000000));
+    const row = {
+      user_id: userId,
+      inspection_type: inspectionType,
+      asset_name: assetName || 'FAMILY-ALL',
+      serial_number: serialNumber || null,
+      location: location || 'No location specified',
+      assignment_notes: assignmentNotes || '',
+      app_id: appId,
+    };
+
+    const { error } = await supabase.from('inspections').insert(row);
+    if (error) {
+      setSubmitting(false);
+      Alert.alert('Save Failed', error.message || 'Could not save to Supabase.');
+      return;
+    }
+
+    setSubmitting(false);
     onSubmit({
-      id: String(Math.floor(10000000 + Math.random() * 90000000)),
+      id: appId,
       title: `${inspectionType} Inspection`,
       subtitle: inspectionType,
       address: location || 'No location specified',
       lastUpdate: `Last Update: ${dateStr}`,
       assetName: assetName || 'FAMILY-ALL',
+      serialNumber: serialNumber || null,
       assignmentNotes: assignmentNotes || '',
     });
   };
@@ -343,6 +420,15 @@ function CreateInspectionFormScreen({ onBack, onSubmit }) {
           onChangeText={setAssetName}
         />
 
+        <Text style={styles.createFormLabel}>Serial Number</Text>
+        <TextInput
+          style={styles.createFormInput}
+          placeholder="e.g. SN-12345"
+          placeholderTextColor="#9E9E9E"
+          value={serialNumber}
+          onChangeText={setSerialNumber}
+        />
+
         <Text style={styles.createFormLabel}>Location</Text>
         <TextInput
           style={styles.createFormInput}
@@ -363,8 +449,14 @@ function CreateInspectionFormScreen({ onBack, onSubmit }) {
           numberOfLines={3}
         />
 
-        <TouchableOpacity style={[styles.primaryButton, styles.createFormSubmit]} onPress={handleSubmit}>
-          <Text style={styles.primaryButtonText}>Create Inspection</Text>
+        <TouchableOpacity
+          style={[styles.primaryButton, styles.createFormSubmit]}
+          onPress={handleSubmit}
+          disabled={submitting}
+        >
+          <Text style={styles.primaryButtonText}>
+            {submitting ? 'Saving...' : 'Create Inspection'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -566,6 +658,27 @@ export default function App() {
   const [inspectionScreen, setInspectionScreen] = useState(INSPECTION_SCREENS.LIST);
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [inspections, setInspections] = useState(INITIAL_INSPECTIONS);
+  const [userId, setUserId] = useState(null);
+  const [userIdLoaded, setUserIdLoaded] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(USER_ID_STORAGE_KEY)
+      .then(stored => {
+        const value = stored && String(stored).trim() ? String(stored).trim() : null;
+        setUserId(value);
+      })
+      .catch(() => setUserId(null))
+      .finally(() => setUserIdLoaded(true));
+  }, []);
+
+  const handleUserIdChange = newId => {
+    setUserId(newId);
+    AsyncStorage.setItem(USER_ID_STORAGE_KEY, newId);
+  };
+
+  const handleUserIdContinue = () => {
+    // Modal closes because userId is now set
+  };
 
   const handleOpenInspection = inspection => {
     setSelectedInspection(inspection);
@@ -599,6 +712,7 @@ export default function App() {
     if (inspectionScreen === INSPECTION_SCREENS.CREATE) {
       return (
         <CreateInspectionFormScreen
+          userId={userId}
           onBack={() => setInspectionScreen(INSPECTION_SCREENS.LIST)}
           onSubmit={handleCreateInspectionSubmit}
         />
@@ -649,6 +763,14 @@ export default function App() {
         {renderCurrentTab()}
         <BottomTabBar currentTab={currentTab} onChangeTab={setCurrentTab} />
       </View>
+      {userIdLoaded && (
+        <UserIdPromptModal
+          visible={!userId}
+          userId={userId}
+          onUserIdChange={handleUserIdChange}
+          onContinue={handleUserIdContinue}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -657,6 +779,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '100%',
+    maxWidth: 360,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#000',
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#616161',
+    marginBottom: 20,
+  },
+  modalInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#000',
+    marginBottom: 20,
+  },
+  modalButton: {
+    alignSelf: 'stretch',
   },
   appShell: {
     flex: 1,
