@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './lib/supabase';
+import { InspectionProvider } from './context/InspectionContext';
+import DiagramScreen from './screens/DiagramScreen';
 
 const TABS = {
   FLEET: 'Fleet',
@@ -25,6 +27,7 @@ const INSPECTION_SCREENS = {
   LIST: 'List',
   CREATE: 'Create',
   DETAIL: 'Detail',
+  DIAGRAM: 'Diagram',
   WALK_AROUND: 'WalkAround',
   GENERAL_INFO: 'GeneralInfo',
 };
@@ -274,7 +277,7 @@ function InspectionsListScreen({ inspections, onOpenInspection, onCreateInspecti
   );
 }
 
-function InspectionDetailScreen({ inspection, onBackToList, onOpenWalkAround, onOpenGeneral }) {
+function InspectionDetailScreen({ inspection, onBackToList, onOpenDiagram, onOpenGeneral }) {
   const assetName = inspection?.assetName || 'FAMILY-ALL';
   return (
     <View style={styles.screenContainer}>
@@ -307,9 +310,20 @@ function InspectionDetailScreen({ inspection, onBackToList, onOpenWalkAround, on
           <Text style={styles.sectionRowTitle}>General Info & Comments</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.sectionRow} onPress={onOpenWalkAround}>
-          <Text style={styles.sectionRowTitle}>1. Walk Around</Text>
-          <Text style={styles.sectionRowSubtitle}>0 of 5</Text>
+        {/* AI Diagram Inspection — primary entry point */}
+        <TouchableOpacity style={[styles.sectionRow, styles.diagramSectionRow]} onPress={onOpenDiagram}>
+          <View style={styles.diagramSectionContent}>
+            <View>
+              <Text style={styles.diagramSectionTitle}>AI Walk-Around Inspection</Text>
+              <Text style={styles.diagramSectionSubtitle}>
+                Interactive diagram with AI photo analysis
+              </Text>
+            </View>
+            <View style={styles.diagramSectionBadge}>
+              <Text style={styles.diagramSectionBadgeText}>CAT 982M</Text>
+            </View>
+          </View>
+          <Text style={styles.diagramSectionArrow}>›</Text>
         </TouchableOpacity>
       </ScrollView>
       <View style={styles.detailFooter}>
@@ -724,8 +738,17 @@ export default function App() {
         <InspectionDetailScreen
           inspection={selectedInspection}
           onBackToList={() => setInspectionScreen(INSPECTION_SCREENS.LIST)}
-          onOpenWalkAround={() => setInspectionScreen(INSPECTION_SCREENS.WALK_AROUND)}
+          onOpenDiagram={() => setInspectionScreen(INSPECTION_SCREENS.DIAGRAM)}
           onOpenGeneral={() => setInspectionScreen(INSPECTION_SCREENS.GENERAL_INFO)}
+        />
+      );
+    }
+
+    if (inspectionScreen === INSPECTION_SCREENS.DIAGRAM) {
+      return (
+        <DiagramScreen
+          inspection={selectedInspection}
+          onBack={() => setInspectionScreen(INSPECTION_SCREENS.DETAIL)}
         />
       );
     }
@@ -756,22 +779,30 @@ export default function App() {
     }
   };
 
+  // DiagramScreen is full-screen; hide the tab bar when it's active
+  const isDiagramActive =
+    currentTab === TABS.INSPECTIONS && inspectionScreen === INSPECTION_SCREENS.DIAGRAM;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="light" />
-      <View style={styles.appShell}>
-        {renderCurrentTab()}
-        <BottomTabBar currentTab={currentTab} onChangeTab={setCurrentTab} />
-      </View>
-      {userIdLoaded && (
-        <UserIdPromptModal
-          visible={!userId}
-          userId={userId}
-          onUserIdChange={handleUserIdChange}
-          onContinue={handleUserIdContinue}
-        />
-      )}
-    </SafeAreaView>
+    <InspectionProvider>
+      <SafeAreaView style={styles.container}>
+        <StatusBar style="light" />
+        <View style={styles.appShell}>
+          {renderCurrentTab()}
+          {!isDiagramActive && (
+            <BottomTabBar currentTab={currentTab} onChangeTab={setCurrentTab} />
+          )}
+        </View>
+        {userIdLoaded && (
+          <UserIdPromptModal
+            visible={!userId}
+            userId={userId}
+            onUserIdChange={handleUserIdChange}
+            onContinue={handleUserIdContinue}
+          />
+        )}
+      </SafeAreaView>
+    </InspectionProvider>
   );
 }
 
@@ -1302,5 +1333,50 @@ const styles = StyleSheet.create({
   createFormSubmit: {
     marginTop: 32,
     borderRadius: 8,
+  },
+
+  // ── Diagram entry row in InspectionDetailScreen ───────────────────────────
+  diagramSectionRow: {
+    backgroundColor: '#111',
+    borderWidth: 1,
+    borderColor: '#FFD600',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+  },
+  diagramSectionContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  diagramSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFD600',
+    marginBottom: 2,
+  },
+  diagramSectionSubtitle: {
+    fontSize: 12,
+    color: '#888',
+  },
+  diagramSectionBadge: {
+    backgroundColor: '#FFD600',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  diagramSectionBadgeText: {
+    color: '#000',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  diagramSectionArrow: {
+    color: '#FFD600',
+    fontSize: 22,
+    marginLeft: 8,
   },
 });

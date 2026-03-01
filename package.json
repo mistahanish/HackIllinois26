@@ -13,9 +13,14 @@
     "@supabase/supabase-js": "^2.98.0",
     "dotenv": "^17.3.1",
     "expo": "~54.0.0",
+    "expo-constants": "^55.0.7",
+    "expo-file-system": "^55.0.10",
+    "expo-image-picker": "^55.0.10",
+    "expo-sharing": "^55.0.11",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
-    "react-native": "0.81.5"
+    "react-native": "0.81.5",
+    "react-native-svg": "^15.15.3"
   },
   "private": true
 }
