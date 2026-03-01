@@ -54,7 +54,7 @@ DEFAULT_ANNOTATED_DIR = _SCRIPT_DIR / "cattrack_annotated"
 # Preferred model. Gemini 3 Pro is NOT on the free tier (0 quota); you'll get 429 on free keys.
 # Free-tier models: gemini-2.5-flash, gemini-2.5-pro, gemini-2.5-flash-lite. Override via env:
 #   GEMINI_MODEL=gemini-2.5-flash python cattrack_inspect.py ...
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3-pro-preview")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
 
 IMAGE_REGISTRY = [
     # Pass folder (ground truth: pass)

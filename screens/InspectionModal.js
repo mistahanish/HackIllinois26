@@ -198,16 +198,18 @@ export default function InspectionModal({
                 ))}
               </View>
 
-              {/* Suggested Fixes */}
-              <TouchableOpacity
-                style={styles.suggestedFixesButton}
-                onPress={() => setShowFixes(!showFixes)}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.suggestedFixesText}>
-                  {showFixes ? '▼  Hide Suggested Fix' : '▶  Suggested Fix'}
-                </Text>
-              </TouchableOpacity>
+              {/* Suggested Fixes — only relevant when something failed */}
+              {(pointState.status === 'monitor' || pointState.status === 'action') && (
+                <TouchableOpacity
+                  style={styles.suggestedFixesButton}
+                  onPress={() => setShowFixes(!showFixes)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={styles.suggestedFixesText}>
+                    {showFixes ? '▼  Hide Suggested Fix' : '▶  Suggested Fix'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {showFixes && (
                 <View style={styles.fixCard}>
