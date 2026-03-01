@@ -1,7 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useMemo, useState, useEffect } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './lib/supabase';
 import { InspectionProvider } from './context/InspectionContext';
@@ -785,6 +785,7 @@ export default function App() {
 
   return (
     <InspectionProvider>
+      <SafeAreaProvider>
       <SafeAreaView style={styles.container}>
         <StatusBar style="light" />
         <View style={styles.appShell}>
@@ -802,6 +803,7 @@ export default function App() {
           />
         )}
       </SafeAreaView>
+      </SafeAreaProvider>
     </InspectionProvider>
   );
 }

@@ -1,9 +1,8 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Animated,
   Dimensions,
   Image,
-  SafeAreaView,
   Share,
   StyleSheet,
   Text,
@@ -12,9 +11,11 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { useInspection } from '../context/InspectionContext';
+import { supabase } from '../lib/supabase';
 import { PERSPECTIVES, findPointById } from '../data/inspectionData';
 import { buildRepairList, calculateTotalPrice } from '../lib/partsApi';
 import InspectionModal from './InspectionModal';
@@ -49,7 +50,27 @@ const SUB_SCREEN = {
 };
 
 export default function DiagramScreen({ inspection, onBack }) {
-  const { state, getActionItems } = useInspection();
+  const { state, getActionItems, setInspectionDbId } = useInspection();
+
+  // Resolve the Supabase UUID for this inspection (app_id → UUID) on mount
+  useEffect(() => {
+    if (!inspection?.id) return;
+    supabase
+      .from('inspections')
+      .select('id')
+      .eq('app_id', inspection.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('[DiagramScreen] Could not resolve inspection UUID:', error.message);
+          return;
+        }
+        if (data?.id) {
+          setInspectionDbId(data.id);
+          console.log('[DiagramScreen] Resolved inspection UUID:', data.id);
+        }
+      });
+  }, [inspection?.id, setInspectionDbId]);
   const [perspectiveId, setPerspectiveId] = useState('front');
   const [imageLayout, setImageLayout] = useState({ width: SW, height: SW * 0.6 });
 
@@ -172,7 +193,7 @@ export default function DiagramScreen({ inspection, onBack }) {
       const filename = `CATrack_Inspection_${Date.now()}.csv`;
       const fileUri = FileSystem.documentDirectory + filename;
       await FileSystem.writeAsStringAsync(fileUri, csv, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: 'utf8',
       });
 
       const canShare = await Sharing.isAvailableAsync();
@@ -196,7 +217,7 @@ export default function DiagramScreen({ inspection, onBack }) {
       const filename = `CATrack_Inspection_${Date.now()}.csv`;
       const fileUri = FileSystem.documentDirectory + filename;
       await FileSystem.writeAsStringAsync(fileUri, csv, {
-        encoding: FileSystem.EncodingType.UTF8,
+        encoding: 'utf8',
       });
 
       const canShare = await Sharing.isAvailableAsync();

@@ -2,7 +2,6 @@ import React, { useState, useCallback } from 'react';
 import {
   Dimensions,
   Image,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +9,7 @@ import {
   StatusBar,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import { useInspection } from '../context/InspectionContext';
 import { findPointById } from '../data/inspectionData';

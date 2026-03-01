@@ -4,17 +4,18 @@ import {
   Alert,
   Dimensions,
   Image,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useInspection } from '../context/InspectionContext';
 import { evaluateInspectionImage, evaluationToStatus } from '../lib/geminiApi';
 import { findPointById } from '../data/inspectionData';
+import { supabase } from '../lib/supabase';
 
 const { width: SW, height: SH } = Dimensions.get('window');
 const CELL_SIZE = (SW - 32 - 8 * 2) / 3;
@@ -27,7 +28,7 @@ const CELL_SIZE = (SW - 32 - 8 * 2) / 3;
  *   onBack    — navigate back to inspection modal
  */
 export default function PhotoCaptureScreen({ pointId, onBack }) {
-  const { addPhoto, updatePhotoEvaluation, setStatus, state } = useInspection();
+  const { addPhoto, updatePhotoEvaluation, setStatus, state, inspectionDbId } = useInspection();
   const point = findPointById(pointId);
   const [pendingPhotos, setPendingPhotos] = useState([]);
   const [confirming, setConfirming] = useState(false);
@@ -81,10 +82,23 @@ export default function PhotoCaptureScreen({ pointId, onBack }) {
     setConfirming(true);
 
     for (const photo of pendingPhotos) {
-      // Add immediately with processing=true
+      // 1. Add to local context immediately with processing=true
       addPhoto(pointId, photo);
 
-      // Fire-and-forget evaluation
+      // 2. Save photo record to Supabase (fire-and-forget if no inspectionDbId yet)
+      if (inspectionDbId) {
+        supabase.from('inspection_photos').insert({
+          inspection_id: inspectionDbId,
+          point_id: pointId,
+          client_photo_id: photo.id,
+          processing: true,
+        }).then(({ error }) => {
+          if (error) console.warn('[DB] inspection_photos insert failed:', error.message);
+          else console.log('[DB] inspection_photos saved:', photo.id);
+        });
+      }
+
+      // 3. Fire-and-forget Gemini evaluation + Supabase saves
       (async () => {
         try {
           const evaluation = await evaluateInspectionImage(
@@ -93,15 +107,50 @@ export default function PhotoCaptureScreen({ pointId, onBack }) {
             point?.specificPrompt || ''
           );
           const autoStatus = evaluationToStatus(evaluation);
-          updatePhotoEvaluation(
-            pointId,
-            photo.id,
-            evaluation,
-            evaluation.description,
-            autoStatus
-          );
+
+          // Update local context
+          updatePhotoEvaluation(pointId, photo.id, evaluation, evaluation.description, autoStatus);
+
+          // Save evaluation + upsert point result to Supabase
+          if (inspectionDbId) {
+            // Resolve the photo's DB UUID first
+            const { data: photoRow } = await supabase
+              .from('inspection_photos')
+              .select('id')
+              .eq('client_photo_id', photo.id)
+              .single();
+
+            if (photoRow?.id) {
+              const { error: evalErr } = await supabase.from('photo_evaluations').insert({
+                photo_id: photoRow.id,
+                verdict: evaluation.verdict === 'pass' ? 'pass' : 'fail',
+                description: evaluation.description || '',
+                auto_status: autoStatus,
+                issues: evaluation.issues || [],
+                raw_runs: [],
+                runs_succeeded: evaluation.issues != null ? 1 : 0,
+                runs_attempted: 3,
+              });
+              if (evalErr) console.warn('[DB] photo_evaluations insert failed:', evalErr.message);
+              else console.log('[DB] photo_evaluations saved for', photo.id);
+            }
+
+            // Upsert the inspection point result
+            const pointData = findPointById(pointId);
+            const { error: iprErr } = await supabase.from('inspection_point_results').upsert({
+              inspection_id: inspectionDbId,
+              point_id: pointId,
+              point_label: pointData?.label || pointId,
+              perspective_id: pointData?.perspectiveId || '',
+              image_type: pointData?.imageType || 'general',
+              status: autoStatus || 'pending',
+              notes: evaluation.description || '',
+            }, { onConflict: 'inspection_id,point_id', ignoreDuplicates: false });
+            if (iprErr) console.warn('[DB] inspection_point_results upsert failed:', iprErr.message);
+            else console.log('[DB] inspection_point_results upserted for', pointId);
+          }
         } catch (e) {
-          console.warn('Gemini evaluation failed for', photo.id, e.message);
+          console.warn('[Gemini] evaluation failed for', photo.id, e.message);
           updatePhotoEvaluation(pointId, photo.id, null, '', null);
         }
       })();
@@ -110,7 +159,7 @@ export default function PhotoCaptureScreen({ pointId, onBack }) {
     setConfirming(false);
     setPendingPhotos([]);
     onBack && onBack();
-  }, [pendingPhotos, pointId, point, addPhoto, updatePhotoEvaluation, onBack]);
+  }, [pendingPhotos, pointId, point, addPhoto, updatePhotoEvaluation, inspectionDbId, onBack]);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
+import React, { createContext, useContext, useReducer, useCallback, useState } from 'react';
 import { ALL_INSPECTION_POINTS } from '../data/inspectionData';
 
 /**
@@ -118,6 +118,8 @@ const InspectionContext = createContext(null);
 
 export function InspectionProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, null, buildInitialState);
+  // UUID of the currently-active inspection row in Supabase (null until resolved)
+  const [inspectionDbId, setInspectionDbId] = useState(null);
 
   const setStatus = useCallback((pointId, status) => {
     dispatch({ type: ACTION.SET_STATUS, pointId, status });
@@ -181,6 +183,8 @@ export function InspectionProvider({ children }) {
         removePhoto,
         resetInspection,
         getActionItems,
+        inspectionDbId,
+        setInspectionDbId,
       }}
     >
       {children}
