@@ -1,23 +1,27 @@
 """
-CAT Articulated Truck - Safety & Maintenance Inspection
-PDF Parser & Supabase Uploader
--------------------------------------------------------
-Parses checklist items (item name + inspection description)
-from the CAT Articulated Truck Safety & Maintenance Inspection PDF
-and uploads them to a Supabase PostgreSQL table.
+CAT Safety & Maintenance Inspection - PDF Parser & Supabase Uploader
+--------------------------------------------------------------------
+Parses checklist items (item name + inspection description) from CAT PDFs
+and uploads them to the checklist_templates table. Supports:
+- Articulated Truck (pre-parsed)
+- Wheel Loader QM, HC, GC (parsed from PDF using pdfplumber)
 
 Requirements:
     pip install pdfplumber psycopg2-binary
 
 Usage:
-    # Preview without uploading
-    python upload_at_checklist.py --pdf EN_AT_Safety___Maint__Inspection.pdf --dry-run
+    # Articulated Truck (pre-parsed)
+    python upload_at_checklist.py --dry-run
+    python upload_at_checklist.py
 
-    # Upload to Supabase
-    python upload_at_checklist.py --pdf EN_AT_Safety___Maint__Inspection.pdf
+    # Wheel Loader PDFs (parsed from file)
+    python upload_at_checklist.py --pdf "EN_QM_WL_Safety & Maint. Inspection.pdf" --dry-run
+    python upload_at_checklist.py --wheel-loaders --dry-run
+    python upload_at_checklist.py --wheel-loaders
 """
 
 import re
+import os
 import argparse
 import psycopg2
 from psycopg2.extras import execute_values
@@ -30,6 +34,21 @@ CONNECTION_STRING = (
 )
 
 VEHICLE_TYPE = "Articulated Truck"
+
+# Wheel Loader PDFs: filename -> (vehicle_type, display name)
+WHEEL_LOADER_PDFS = {
+    "EN_QM_WL_Safety & Maint. Inspection.pdf": "Wheel Loader (QM) 986G-994K",
+    "EN_HC_WL_Safety & Maint. Inspection.pdf": "Wheel Loader (HC) 950-982",
+    "EN_GC_WL_Safety & Maint. Inspection.pdf": "Wheel Loader (GC) 902-938",
+}
+
+# Section mapping for wheel loader PDFs: (page_0based, table_index) -> section name
+WL_SECTION_MAP = {
+    (0, 2): "From The Ground",
+    (0, 3): "Engine Compartment",
+    (1, 2): "On The Machine, Outside Cab",
+    (1, 3): "Inside The Cab",
+}
 
 # ── Table schema ───────────────────────────────────────────────────────────────
 CREATE_TABLE_SQL = """
@@ -108,10 +127,43 @@ CHECKLIST_ITEMS = [
 ]
 
 
-def print_preview():
-    print(f"\n── {VEHICLE_TYPE} Checklist ({len(CHECKLIST_ITEMS)} items) ────────────────")
+def _normalize(s: str | None) -> str:
+    """Normalize whitespace and newlines."""
+    if not s or not isinstance(s, str):
+        return ""
+    return re.sub(r"\s+", " ", s.strip())
+
+
+def parse_wheel_loader_pdf(pdf_path: str, vehicle_type: str) -> list[tuple[str, str, str]]:
+    """
+    Parse a Wheel Loader Safety & Maintenance Inspection PDF.
+    Returns list of (section, item_name, inspection_desc).
+    """
+    items: list[tuple[str, str, str]] = []
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_idx, page in enumerate(pdf.pages):
+            tables = page.extract_tables()
+            for table_idx, table in enumerate(tables or []):
+                section = WL_SECTION_MAP.get((page_idx, table_idx))
+                if not section:
+                    continue
+                for row in table:
+                    if not row or len(row) < 3:
+                        continue
+                    item = _normalize(row[0])
+                    desc = _normalize(row[2])
+                    if not item or "What are you" in item:
+                        continue
+                    items.append((section, item, desc))
+    return items
+
+
+def print_preview(items: list[tuple[str, str, str]] | None = None, vehicle_type: str | None = None):
+    items = items or CHECKLIST_ITEMS
+    vt = vehicle_type or VEHICLE_TYPE
+    print(f"\n── {vt} Checklist ({len(items)} items) ────────────────")
     current_section = None
-    for section, name, desc in CHECKLIST_ITEMS:
+    for section, name, desc in items:
         if section != current_section:
             current_section = section
             print(f"\n  [{section}]")
@@ -120,7 +172,9 @@ def print_preview():
     print()
 
 
-def upload_to_supabase():
+def upload_to_supabase(items: list[tuple[str, str, str]] | None = None, vehicle_type: str | None = None):
+    items = items or CHECKLIST_ITEMS
+    vt = vehicle_type or VEHICLE_TYPE
     conn = psycopg2.connect(CONNECTION_STRING)
     cur = conn.cursor()
 
@@ -129,8 +183,8 @@ def upload_to_supabase():
     print("✓ Table ready")
 
     rows = [
-        (VEHICLE_TYPE, section, item_name, inspection_desc)
-        for section, item_name, inspection_desc in CHECKLIST_ITEMS
+        (vt, section, item_name, inspection_desc)
+        for section, item_name, inspection_desc in items
     ]
 
     insert_sql = """
@@ -140,21 +194,57 @@ def upload_to_supabase():
     execute_values(cur, insert_sql, rows)
     conn.commit()
 
-    print(f"✓ Uploaded {len(rows)} items to Supabase → checklist_templates")
+    print(f"✓ Uploaded {len(rows)} items ({vt}) to Supabase → checklist_templates")
     cur.close()
     conn.close()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Upload CAT Articulated Truck checklist to Supabase"
+        description="Upload CAT Safety & Maintenance checklists to Supabase"
     )
-    parser.add_argument("--pdf", required=False, help="Path to PDF (not required — items are pre-parsed)")
+    parser.add_argument("--pdf", help="Path to a single PDF (Wheel Loader QM/HC/GC)")
+    parser.add_argument("--wheel-loaders", action="store_true", help="Parse and upload all three Wheel Loader PDFs")
     parser.add_argument("--dry-run", action="store_true", help="Preview without uploading")
     args = parser.parse_args()
 
-    print_preview()
+    base_dir = os.path.dirname(os.path.abspath(__file__))
 
+    if args.wheel_loaders:
+        for filename, vehicle_type in WHEEL_LOADER_PDFS.items():
+            path = os.path.join(base_dir, filename)
+            if not os.path.isfile(path):
+                print(f"⚠ Skipping {filename} (file not found)")
+                continue
+            items = parse_wheel_loader_pdf(path, vehicle_type)
+            print_preview(items, vehicle_type)
+            if not args.dry_run:
+                upload_to_supabase(items, vehicle_type)
+        if args.dry_run:
+            print("Dry run — skipping upload.")
+        return
+
+    if args.pdf:
+        path = os.path.join(base_dir, args.pdf) if not os.path.isabs(args.pdf) else args.pdf
+        if not os.path.isfile(path):
+            print(f"Error: File not found: {path}")
+            return
+        basename = os.path.basename(path)
+        if basename in WHEEL_LOADER_PDFS:
+            vehicle_type = WHEEL_LOADER_PDFS[basename]
+            items = parse_wheel_loader_pdf(path, vehicle_type)
+            print_preview(items, vehicle_type)
+            if not args.dry_run:
+                upload_to_supabase(items, vehicle_type)
+        else:
+            print("Warning: Unknown PDF. Using Articulated Truck (pre-parsed).")
+            print_preview()
+            if not args.dry_run:
+                upload_to_supabase()
+        return
+
+    # Default: Articulated Truck (pre-parsed)
+    print_preview()
     if args.dry_run:
         print("Dry run — skipping upload.")
     else:

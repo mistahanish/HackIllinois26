@@ -39,7 +39,7 @@ conda activate HackAstra
 ### 2.2 Install Node dependencies
 
 From the **project root** (`HackIllinois26`):
-
+.  
 ```bash
 npm install
 ```
@@ -180,96 +180,39 @@ The script contains a hardcoded Supabase connection string; change it for your o
 
 ---
 
-## 5. Deploy the app
+## 5. CAT parts lookup (optional)
 
-You can ship the Expo app as **standalone iOS/Android builds** (via EAS Build) or as a **web app**. Supabase is already hosted; ensure your production Supabase project and env vars are set for the build.
+`cat_parts_lookup.py` fetches product links, names, part numbers, and prices from [parts.cat.com](https://parts.cat.com/en/catcorp/shop-all-categories) for a given part name. It uses **Playwright** to load JavaScript-rendered search results.
 
-### 5.1 EAS Build (iOS & Android)
+### 5.1 Install Playwright browsers
 
-[EAS Build](https://docs.expo.dev/build/introduction/) builds your app in the cloud and produces installable binaries (e.g. for TestFlight, Google Play, or internal distribution).
-
-1. **Install EAS CLI and log in**
-
-   ```bash
-   npm install -g eas-cli
-   eas login
-   ```
-
-   Create a free account at [expo.dev/signup](https://expo.dev/signup) if needed.
-
-2. **Configure the project** (first time only)
-
-   From the project root:
-
-   ```bash
-   eas build:configure
-   ```
-
-   This creates or updates `eas.json` with build profiles (`development`, `preview`, `production`). You can use the default profiles as-is.
-
-3. **Set environment variables for builds**
-
-   The app needs `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` at build time (they are read by `app.config.js`). Set them as **EAS Secrets** so they are available in the cloud build:
-
-   ```bash
-   eas secret:create --name EXPO_PUBLIC_SUPABASE_URL --value "https://YOUR_PROJECT.supabase.co"
-   eas secret:create --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "your_anon_key_here"
-   ```
-
-   Use your real Supabase project URL and anon key (same as in `.env` for local dev). You can also configure per-profile env in `eas.json` or in the [Expo dashboard](https://expo.dev) under your project → Secrets.
-
-4. **Run a build**
-   - **Preview** (internal testing; installable without app stores):
-
-     ```bash
-     eas build --profile preview --platform all
-     ```
-
-     Use `--platform ios` or `--platform android` for one platform. When the build finishes, EAS gives you a link to download the app (e.g. .ipa for iOS, .apk for Android).
-
-   - **Production** (for App Store / Google Play submission):
-
-     ```bash
-     eas build --profile production --platform all
-     ```
-
-     Then submit to the stores (manually from the EAS dashboard or via `eas submit`). For production, ensure your Apple and Google developer accounts and signing are set up; EAS can manage credentials with `eas credentials`.
-
-**Optional: auto-submit after build**
+From the project root, with the same Python env you use for the app (e.g. `HackAstra` or `ai` venv):
 
 ```bash
-eas build --profile production --platform all --auto-submit
+pip install -r requirements.txt
+python -m playwright install firefox
 ```
 
-This submits the build to TestFlight (iOS) and internal testing (Android) when the build completes, if submission is configured.
+Optionally install Chromium if you prefer: `python -m playwright install chromium`
 
-### 5.2 Web (optional)
-
-The project supports web via Expo. To build and deploy the web bundle:
+### 5.2 Run
 
 ```bash
-npx expo export --platform web
+python cat_parts_lookup.py "fuel tank"
 ```
 
-Output goes to `dist/` (or the path shown in the command). Upload the contents to any static host (e.g. Vercel, Netlify, GitHub Pages). Set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` in the host’s environment so they are available at build time.
-
-### 5.3 Supabase in production
-
-- Use a dedicated Supabase project for production, or the same one as dev.
-- Ensure the **inspections** table exists (run `scripts/create_inspections_table.sql` in the Supabase SQL Editor).
-- Restrict CORS and RLS as needed; the app uses the anon key, so follow [Supabase security practices](https://supabase.com/docs/guides/auth/row-level-security) if you add auth.
+If the site is reachable, you get product results. If the site blocks automation (e.g. Access Denied), you still get one result: the search URL so your app can link users to CAT. You can also pass pre-fetched HTML: `get_part_details("fuel tank", html=your_html_string)`.
 
 ---
 
 ## Quick reference
 
-| Goal                       | Command                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------- |
-| Run the Expo app           | `./run.sh` or `conda activate HackAstra && npm start`                                          |
-| Install app deps           | `npm install` (in project root)                                                                |
-| Run Gemini text            | `python ai/gemini_basic.py` (with `ai` venv and `.env` set)                                    |
-| Run Gemini image           | `python ai/gemini_image_test.py <image path>`                                                  |
-| Checklist upload (dry run) | `python upload_at_checklist.py --dry-run`                                                      |
-| EAS preview build          | `eas build --profile preview --platform all` (after `eas build:configure` and setting secrets) |
-| EAS production build       | `eas build --profile production --platform all`                                                |
-| Export web bundle          | `npx expo export --platform web`                                                               |
+| Goal                       | Command                                                                 |
+| -------------------------- | ----------------------------------------------------------------------- |
+| **Run the app**            | `./run.sh` (or `conda activate HackAstra && npm start`)                 |
+| Install app deps           | `npm install` (in project root)                                         |
+| Run Gemini text            | `python ai/gemini_basic.py` (with `ai` venv and `.env` set)             |
+| Run Gemini image           | `python ai/gemini_image_test.py <image path>`                           |
+| Checklist upload (dry run) | `python upload_at_checklist.py --dry-run`                               |
+| Checklist upload           | `python upload_at_checklist.py`                                         |
+| CAT parts lookup           | `python cat_parts_lookup.py "part name"` (requires `playwright install firefox`) |
